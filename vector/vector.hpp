@@ -190,21 +190,4 @@ Vector<Type>& Vector<Type>::operator-=(const Vector<Type> v){
   return *this;
 }
 
-/*template <class Type>
-Vector<Type>& Vector<Type>::operator*(const Type num){
-  for(int i = 0; i < _size; i++)
-    _array[i] *= num;
-  return *this;
-}*/
-/*template <class Type>
-const Vector<Type> Vector<Type>::operator+(const Vector<Type> &left, const Vector<Type>& right){
-  if(left._size != right._size)
-    throw std::length_error("Different length of vectors");
-  Vector<Type> sum(left._size);
-  for(int i = 0; i < sum._size; i++){
-    sum._array[i] = right._array[i] + left._array[i];
-    std::cout << "v1 + v2 = " << sum._array[i] << std::endl;
-  }
-  return sum;
-}*/
 #endif
