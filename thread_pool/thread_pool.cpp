@@ -5,6 +5,7 @@
 #include <condition_variable>
 #include <iostream>
 #include <cstdlib>
+#include <atomic>
 
 typedef void (*Task)(void*);
 
@@ -33,18 +34,35 @@ private:
   std::vector<std::thread> slaves;
   std::mutex tasksLock;
   std::condition_variable cv;
-  static void _slave(std::mutex& mutex, std::condition_variable& cond, std::vector<job>& v);
+  static void _slave(std::mutex& mutex, std::condition_variable& cond, std::vector<job>& v,
+    std::atomic<int>& _active, std::atomic<bool>& _end);
+  std::atomic<int> _active;
+  std::atomic<bool> _end;
 };
 
 thread_pool::thread_pool(int thread_num) :
-  _thread_num(thread_num)
+  _thread_num(thread_num),
+  _active(0),
+  _end(false)
 {
   if(thread_num > 0)
     for(int i = 0; i < thread_num; i++)
-      slaves.push_back(std::thread(_slave, std::ref(tasksLock), std::ref(cv), std::ref(_tasks)));
+      slaves.push_back(std::thread(_slave, std::ref(tasksLock), std::ref(cv), std::ref(_tasks), std::ref(_active), std::ref(_end)));
 }
 
 thread_pool::~thread_pool(){
+  while(_active != 0){
+    tasksLock.lock();
+    if(_tasks.empty() == true){
+      tasksLock.unlock();
+      break;
+    }
+    tasksLock.unlock();
+  }
+  _end = true;
+  cv.notify_all();
+  for(auto& thread : slaves){
+    thread.join();}
 }
 
 void thread_pool::post(Task task, void* taskData){
@@ -54,7 +72,8 @@ void thread_pool::post(Task task, void* taskData){
   cv.notify_one();
 }
 
-void thread_pool::_slave(std::mutex& mutex, std::condition_variable& cond, std::vector<job>& v){
+void thread_pool::_slave(std::mutex& mutex, std::condition_variable& cond, std::vector<job>& v,
+  std::atomic<int>& _active, std::atomic<bool>& _end){
   Task task;
   void* arg;
   mutex.lock();
@@ -62,15 +81,19 @@ void thread_pool::_slave(std::mutex& mutex, std::condition_variable& cond, std::
   mutex.unlock();
 
   std::unique_lock<std::mutex> locker(mutex);
-  while(true){
+  while(_end != true) {
      cond.wait(locker, [&](){
        return !v.empty();
      });
+     if(_end == true)
+      break;
+     _active++;
     task = v.back()._task;
     arg = v.back()._arg;
     v.pop_back();
     mutex.unlock();
     task(arg);
+    _active--;
   }
 }
 
@@ -83,6 +106,5 @@ int main(){
   pool.post(test, NULL);
   pool.post(test, NULL);
   pool.post(test, NULL);
-  while(true);
   return 0;
 }
