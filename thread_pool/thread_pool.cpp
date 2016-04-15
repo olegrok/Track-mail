@@ -46,8 +46,6 @@ const std::error_category& DataBase_category(){
   return instance;
 }
 
-
-
 std::error_code make_error_code(DataBaseErr e){
   return std::error_code(static_cast<int>(e), DataBase_category());
 }
@@ -57,26 +55,42 @@ std::error_condition make_error_condition(DataBaseErr e){
 }
 
 
-typedef void (*Task)(void*);
 
-void test(void* abc){
-  std::cout << "hello:" << std::endl;
+
+typedef void (*Task)(int);
+
+bool probably_calc(int probably){
+  return (rand() % 100 > probably);
+}
+
+void test(int probably){
+  std::error_code e;
+  bool err = probably_calc(probably);
+  if(err){
+      e = DataBaseErr::ok;
+      std::cout << e.message() << std::endl;
+  }
+  else
+  {
+      e = DataBaseErr::wrong_request;
+      std::cout << e.message() << std::endl;
+  }
 }
 
 struct job {
-  job(Task task, void* arg){
+  job(Task task, int arg){
       _task = task;
       _arg = arg;
   }
   Task _task;
-  void* _arg;
+  int _arg;
 };
 
 class thread_pool{
 public:
   thread_pool(int thread_num);
   ~thread_pool();
-  void post(Task task, void* taskData);
+  void post(Task task, int taskData);
 
 private:
   int _thread_num;
@@ -102,16 +116,23 @@ thread_pool::thread_pool(int thread_num) :
 }
 
 thread_pool::~thread_pool(){
+  bool empty;
+  do{
+    tasksLock.lock();
+    empty = _tasks.empty();
+    tasksLock.unlock();
+  }
+  while(empty);
   while(_active != 0);
+
   _end = true;
   cv.notify_all();
   for(auto& thread : slaves){
-    std::cout << "join" << std::endl;
     thread.join();
   }
 }
 
-void thread_pool::post(Task task, void* taskData){
+void thread_pool::post(Task task, int taskData){
   tasksLock.lock();
   _tasks.push_back(job(task, taskData));
   tasksLock.unlock();
@@ -121,11 +142,11 @@ void thread_pool::post(Task task, void* taskData){
 void thread_pool::_slave(std::mutex& mutex, std::condition_variable& cond, std::vector<job>& v,
   std::atomic<int>& _active, std::atomic<bool>& _end){
   Task task;
-  void* arg;
+  int arg;
 
   _active--;
   while(_active != 0);
-  std::cout << _active << std::endl;
+
 
   mutex.lock();
   std::cout << "thread " << std::this_thread::get_id() << " created" << std::endl;
@@ -152,21 +173,24 @@ void thread_pool::_slave(std::mutex& mutex, std::condition_variable& cond, std::
     _active--;
   }
   mutex.unlock();
-  std::cout << "joined " << std::this_thread::get_id() << std::endl;
 }
 
 int main(){
+  int probably;
+  std::cin >> probably;
+  thread_pool pool(3);
+  for(int i = 0; i < 10; i++){
+      pool.post(test, probably);
+  }
   /*std::error_code e;
   e = DataBaseErr::can_not_open;
   std::cout << e.message() << std::endl;*/
-  int a = 0;
-  thread_pool pool(5);
-  pool.post(test, NULL);
-  pool.post(test, NULL);
-  //std::cin >> a;
+  //int a = 0;
+  //thread_pool pool(5);
+  /*pool.post(test, NULL);
   pool.post(test, NULL);
   pool.post(test, NULL);
   pool.post(test, NULL);
-  std::cin >> a;
+  pool.post(test, NULL);*/
   return 0;
 }
