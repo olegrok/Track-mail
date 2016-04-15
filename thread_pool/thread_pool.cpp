@@ -129,11 +129,6 @@ void thread_pool::post(std::function<void()> task){
 void thread_pool::_slave(std::mutex& mutex, std::condition_variable& cond,
     std::vector<std::function<void()>>& v, std::atomic<bool>& _end){
   //std::function<void()> task;
-  int arg;
-
-//  _active--;
-//   while(_active != 0);
-
 
   mutex.lock();
   std::cout << "thread " << std::this_thread::get_id() << " created" << std::endl;
@@ -152,10 +147,8 @@ void thread_pool::_slave(std::mutex& mutex, std::condition_variable& cond,
      mutex.unlock();
      break;
   }
-
     auto task = v.back();
     v.pop_back();
-    mutex.unlock();
     task();
   }
 }
