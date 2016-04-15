@@ -8,6 +8,7 @@
 #include <atomic>
 #include <system_error>
 #include <string>
+#include <functional>
 
 enum class DataBaseErr : int {
   ok = 7000,
@@ -57,8 +58,6 @@ std::error_condition make_error_condition(DataBaseErr e){
 
 
 
-typedef void (*Task)(int);
-
 bool probably_calc(int probably){
   return (rand() % 100 > probably);
 }
@@ -77,42 +76,31 @@ void test(int probably){
   }
 }
 
-struct job {
-  job(Task task, int arg){
-      _task = task;
-      _arg = arg;
-  }
-  Task _task;
-  int _arg;
-};
-
 class thread_pool{
 public:
   thread_pool(int thread_num);
   ~thread_pool();
-  void post(Task task, int taskData);
+  void post(std::function<void()> task);
 
 private:
   int _thread_num;
-  std::vector<job> _tasks;
+  std::vector<std::function<void()>> _tasks;
   std::vector<std::thread> slaves;
   std::mutex tasksLock;
   std::condition_variable cv;
-  static void _slave(std::mutex& mutex, std::condition_variable& cond, std::vector<job>& v,
-    std::atomic<int>& _active, std::atomic<bool>& _end);
-  std::atomic<int> _active;
+  static void _slave(std::mutex& mutex, std::condition_variable& cond,
+      std::vector<std::function<void()>>& v, std::atomic<bool>& _end);
   std::atomic<bool> _end;
 };
 
 thread_pool::thread_pool(int thread_num) :
   _thread_num(thread_num),
-  _active(thread_num),
   _end(false)
 {
   if(thread_num > 0)
     for(int i = 0; i < thread_num; i++)
-      slaves.push_back(std::thread(_slave, std::ref(tasksLock), std::ref(cv), std::ref(_tasks), std::ref(_active), std::ref(_end)));
-    while(_active != 0);
+      slaves.push_back(std::thread(_slave, std::ref(tasksLock), std::ref(cv),
+          std::ref(_tasks), std::ref(_end)));
 }
 
 thread_pool::~thread_pool(){
@@ -123,7 +111,6 @@ thread_pool::~thread_pool(){
     tasksLock.unlock();
   }
   while(empty);
-  while(_active != 0);
 
   _end = true;
   cv.notify_all();
@@ -132,20 +119,20 @@ thread_pool::~thread_pool(){
   }
 }
 
-void thread_pool::post(Task task, int taskData){
+void thread_pool::post(std::function<void()> task){
   tasksLock.lock();
-  _tasks.push_back(job(task, taskData));
+  _tasks.push_back(task);
   tasksLock.unlock();
   cv.notify_one();
 }
 
-void thread_pool::_slave(std::mutex& mutex, std::condition_variable& cond, std::vector<job>& v,
-  std::atomic<int>& _active, std::atomic<bool>& _end){
-  Task task;
+void thread_pool::_slave(std::mutex& mutex, std::condition_variable& cond,
+    std::vector<std::function<void()>>& v, std::atomic<bool>& _end){
+  //std::function<void()> task;
   int arg;
 
-  _active--;
-  while(_active != 0);
+//  _active--;
+//   while(_active != 0);
 
 
   mutex.lock();
@@ -154,33 +141,31 @@ void thread_pool::_slave(std::mutex& mutex, std::condition_variable& cond, std::
 
   std::unique_lock<std::mutex> locker(mutex);
 
-  while(_end == false){
-     cond.wait(locker, [&](){
-       bool empty = !v.empty();
-       return (empty || _end);
-     });
-     if(_end == true){
-//        std::cout << "notified" << std::endl;
-        break;
-      }
+  while(true){
+    if(!_end){
+      cond.wait(locker, [&](){
+        bool empty = !v.empty();
+        return (empty || _end);
+      });
+   }
+   if(_end == true){
+     mutex.unlock();
+     break;
+  }
 
-     _active++;
-    task = v.back()._task;
-    arg = v.back()._arg;
+    auto task = v.back();
     v.pop_back();
     mutex.unlock();
-    task(arg);
-    _active--;
+    task();
   }
-  mutex.unlock();
 }
 
 int main(){
   int probably;
   std::cin >> probably;
   thread_pool pool(3);
-  for(int i = 0; i < 10; i++){
-      pool.post(test, probably);
+  for(int i = 0; i < 50; i++){
+      pool.post(std::bind(test, probably));
   }
   /*std::error_code e;
   e = DataBaseErr::can_not_open;
