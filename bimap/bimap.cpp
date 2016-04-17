@@ -158,7 +158,8 @@ template <class Type>
 class iter : public boost::iterator_facade<
   iter<Type>,
   Type,
-  boost::bidirectional_traversal_tag>
+  boost::bidirectional_traversal_tag
+  >
 {
   friend class boost::iterator_core_access;
   template <class> friend class node_iter;
@@ -186,8 +187,9 @@ private:
   bool equal(iter<OtherValue> const & other) const{
     return _index == other._index;
   }
-  auto& dereference(){
-    return _base._array[_index];
+  auto& dereference() const{
+    auto& pair = _base->_array[_index];
+    return pair;
   }
 };
 
@@ -208,7 +210,11 @@ int main(){
   mymap.insert(std::pair<int, int>(1,2));
   cout << "size:" << endl;
   cout << mymap.size() << endl;
-  cout << std::pair<int, int>(1,2) << endl;
+  iter<bimap<int, int> > it = mymap.begin();
+  (*it);
+  //int first = it->first;
+
+  //cout << it << " " << (*it).second << endl;
 
 
   return 0;
