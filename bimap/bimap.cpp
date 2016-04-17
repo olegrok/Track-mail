@@ -7,12 +7,13 @@
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/utility/enable_if.hpp>
 
-template <class Type>
+//template <typename key, typename val>
+template <template <typename, typename> class Type, typename key, typename val>
 class iter;
 
 template <typename key, typename val>
 class bimap{
-  friend class iter<bimap>;
+  friend class iter<bimap, key, val>;
 public:
   bimap(int size = 0);
   bimap(const bimap<key, val> &copy);
@@ -23,8 +24,8 @@ public:
   bool empty() const;
   val& operator[](const key K);
   bool insert(std::pair<key, val> input);
-  iter<bimap<key, val>> begin();
-  iter<bimap<key, val>> end();
+  iter<bimap, key, val> begin();
+  iter<bimap, key, val> end();
 
 private:
   std::pair<key, val> * _array;
@@ -138,34 +139,32 @@ bool bimap<key, val>::insert(const std::pair<key, val> newElem){
 }
 
 template <typename key, typename val>
-iter< bimap<key, val> > bimap<key, val>::begin(){
-  iter< bimap<key, val> > it(this, 0);
+iter<bimap, key, val> bimap<key, val>::begin(){
+  iter<bimap, key, val> it(this, 0);
   return it;
 }
 
 template <typename key, typename val>
-iter< bimap<key, val> > bimap<key, val>::end(){
-  iter< bimap<key, val> > it(this, _size);
+iter<bimap, key, val> bimap<key, val>::end(){
+  iter<bimap, key, val> it(this, _size);
   return it;
 }
 
 
-
-
-
-
-template <class Type>
+template < template <typename, typename> class Type, typename key, typename val>
 class iter : public boost::iterator_facade<
-  iter<Type>,
-  Type,
-  boost::bidirectional_traversal_tag
+  iter<Type, key, val>,
+  Type<key, val>,
+  boost::bidirectional_traversal_tag,
+  std::pair<key, val>&
   >
 {
   friend class boost::iterator_core_access;
-  template <class> friend class node_iter;
+  //template <template <typename, typename> class, typename, typename>
+  friend class iter<bimap, key, val>;
 
 public:
-  iter(Type* base = 0, int index = 0) :
+  iter(Type<key, val>* base = 0, int index = 0) :
   _base(base),
   _index(index)
   {};
@@ -173,21 +172,21 @@ public:
 
 private:
   struct enabler {};
-  Type* _base;
+  Type<key, val>* _base;
   int _index;
   void increment(){
-    if(_base.size() < _index)
-      ++_index;
+    if(_base->_size > _index)
+      _index++;
   }
   void decrement(){
     if(_index > 0)
-      --_index;
+      _index--;
   }
-  template <class OtherValue>
-  bool equal(iter<OtherValue> const & other) const{
-    return _index == other._index;
+  template <template<typename, typename> class OtherValue>
+  bool equal(iter<OtherValue, key, val> const & other) const{
+    return (_index == other._index);
   }
-  auto& dereference() const{
+  std::pair<key, val>& dereference() const{
     auto& pair = _base->_array[_index];
     return pair;
   }
@@ -208,14 +207,18 @@ int main(){
   mymap.insert(std::pair<int, int>(1,2));
   mymap.insert(std::pair<int, int>(1,2));
   mymap.insert(std::pair<int, int>(1,2));
+  mymap.insert(std::pair<int, int>(3,4));
   cout << "size:" << endl;
   cout << mymap.size() << endl;
-  iter<bimap<int, int> > it = mymap.begin();
-  (*it);
-  //int first = it->first;
-
-  //cout << it << " " << (*it).second << endl;
-
+  auto it_begin = mymap.begin();
+  auto it_end = mymap.end();
+  it_end--;
+  //(*it);
+  cout << (*it_begin).first << " " << (*it_begin).second << endl;
+  cout << (*it_end).first << " " << (*it_end).second << endl;
+  std::for_each(mymap.begin(), mymap.end(), [](std::pair<int, int> pair){
+    cout << pair.first << " " << pair.second << endl;
+  });
 
   return 0;
 }
