@@ -128,8 +128,6 @@ void thread_pool::post(std::function<void()> task){
 
 void thread_pool::_slave(std::mutex& mutex, std::condition_variable& cond,
     std::vector<std::function<void()>>& v, std::atomic<bool>& _end){
-  //std::function<void()> task;
-
   mutex.lock();
   std::cout << "thread " << std::this_thread::get_id() << " created" << std::endl;
   mutex.unlock();

@@ -1,7 +1,7 @@
 #ifndef MY_PERSONAL_LITTLE_VECTOR_H
 #define MY_PERSONAL_LITTLE_VECTOR_H
 
-#include  <algorithm>
+#include <algorithm>
 #include <stdexcept>
 #include <iostream>
 
@@ -10,7 +10,7 @@ class Vector{
 public:
   Vector(int size = 0);
   Vector(const Vector<Type> &copy);
-  Vector(Vector &&move);
+  Vector(Vector<Type> &&move);
   Vector<Type>& operator=(Vector<Type> copied);
   ~Vector();
   int size() const;
@@ -25,7 +25,7 @@ public:
   Vector<Type>& operator+=(const Vector<Type> v);
   Vector<Type>& operator-=(const Vector<Type> v);
 
-  friend Vector<Type>& operator*(Vector<Type> v, const Type num){
+  friend auto operator*(Vector<Type> v, const Type num){
     for(int i = 0; i < v._size; i++)
       v._array[i] *= num;
     return v;
@@ -177,7 +177,7 @@ Vector<Type>& Vector<Type>::operator+=(const Vector<Type> v){
   if(_size != v._size)
     throw std::length_error("Different length of vectors");
   for(int i = 0; i < _size; i++)
-    _array[i] += v[i]._array;
+    _array[i] += v._array[i];
   return *this;
 }
 

@@ -208,6 +208,8 @@ int main(){
   mymap.insert(std::pair<int, int>(1,2));
   cout << "size:" << endl;
   cout << mymap.size() << endl;
+  cout << std::pair<int, int>(1,2) << endl;
+
 
   return 0;
 }
